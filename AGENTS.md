@@ -74,17 +74,17 @@ This dashboard is designed to work with the **Zig AWR-V3 firmware** (`zig-awr-v3
 
 The Zig repo's `scripts/install-pi.sh` is the equivalent of the vendor `setup.py` for the new stack, and ships an `awr-stack` helper (`python|zig|both|stop|status`) so a single Pi can host both the vendor `Adeept_Robot.service` and `awr-v3-zig.service` and switch between them. The dashboard's connection presets cover both ports out of the box.
 
-## End-to-end black-box acceptance
+## End-to-end black-box acceptance — dual-stack
 
-The Zig repo also ships `scripts/run-functional-acceptance.sh`, which boots a **Raspberry Pi OS Bookworm** (`dtcooper/raspberrypi-os:bookworm`, `linux/arm64`) Docker image and runs the entire stack: install script, `awr-stack`, the compiled Zig binary, this dashboard's `npm run test:protocol`, AND a generic WebSocket protocol test against the live Zig binary — all in ~30 seconds, currently 50 / 50 PASS.
+The Zig repo's `scripts/run-functional-acceptance.sh` boots a **Raspberry Pi OS Bookworm** (`dtcooper/raspberrypi-os:bookworm`, `linux/arm64`) Docker image and runs the *entire* AWR-V3 stack end-to-end **for both implementations** — Zig firmware AND the vendor Adeept Python firmware (`setup.py` + `WebServer.py`) — including a live dual-stack phase where both run concurrently (vendor on `:8888`, Zig on `:8889`) and the protocol test passes against both at the same time. 13 phases, ~100 seconds on Apple Silicon, currently 88 / 88 PASS.
 
 When changing either side of the protocol contract (new command, new field on `get_map`, new auth strings, etc.) an agent must:
 
-1. Mirror the change in `ws-server.mjs` (Node simulator) and Zig firmware (`src/net/ws_server.zig`).
-2. Add an assertion to **both** `tests/ws-protocol.test.mjs` (which exercises the simulator's `/state` & `/capabilities` HTTP helpers) **and** `zig-awr-v3/scripts/acceptance/ws-protocol-test.mjs` (which is HTTP-helper-free and runs against either backend).
-3. Re-run `bash zig-awr-v3/scripts/run-functional-acceptance.sh` from the parent of both repos and ensure all 8 phases stay green.
+1. Mirror the change in `ws-server.mjs` (Node simulator) and Zig firmware (`src/net/ws_server.zig`); if the change is in the *common* protocol subset (movement, switches, functions, telemetry), also verify the vendor `WebServer.py` already supports it — if it does not, the change is a Zig-specific extension and must be gated on `INCLUDE_SLAM=1` (or a similar capability flag) in the generic test.
+2. Add an assertion to **both** `tests/ws-protocol.test.mjs` (exercises the simulator's `/state` and `/capabilities` HTTP helpers) **and** `zig-awr-v3/scripts/acceptance/ws-protocol-test.mjs` (HTTP-helper-free; runs against the Zig binary, the Node simulator, and the vendor Python `WebServer.py`).
+3. Re-run `bash zig-awr-v3/scripts/run-functional-acceptance.sh` (with `VENDOR_SRC` pointing at the vendor V3 source) and ensure all 13 phases stay green. This includes empirical evidence that the install scripts run, that the protocols are exercised across both implementations, and that the two stacks coexist without conflict.
 
-This is the gating check that the dashboard, the Zig firmware, and the install/coexistence flow remain self-consistent without requiring a real Pi on the bench.
+This is the gating check that the dashboard, the Zig firmware, the vendor Python firmware, and the install/coexistence flow remain self-consistent without requiring a real Pi on the bench.
 
 ## Known Issues / Future Work
 

@@ -45,6 +45,63 @@ The dashboard is not intended to be served by the robot. Treat it as a local/PWA
 
 The auth handshake is configurable in the UI and defaults to `admin:123456`. The camera app accepts a full MJPEG URL, so the original Flask stream and a future Zig/V4L2 stream can share the same dashboard contract.
 
+```mermaid
+flowchart LR
+    subgraph Host["Dashboard host — laptop or desktop"]
+        direction TB
+        UI["React app shell"]
+        CP["Control Panel"]
+        LOM["Live Occupancy Map"]
+        Apps["Capabilities gallery"]
+        Logs["Telemetry and logs"]
+        WSP["WebSocketProvider hook"]
+        UI --> CP
+        UI --> LOM
+        UI --> Apps
+        UI --> Logs
+        CP --> WSP
+        LOM --> WSP
+        Apps --> WSP
+    end
+
+    WSP <-->|"AWR-V3 protocol — auth, commands, JSON"| Net(("LAN / WiFi"))
+
+    subgraph PiOS["Raspberry Pi 3B/3B+ — Raspberry Pi OS Bookworm"]
+        direction TB
+        Stack["awr-stack helper — systemd toggle"]
+        Py["Adeept_Robot.service — Python on :8888"]
+        Zg["awr-v3-zig.service — Zig on :8889"]
+        Stack -.->|enable or disable| Py
+        Stack -.->|enable or disable| Zg
+        HAL["HAL — /dev/gpiomem, /dev/i2c-1, /dev/spidev0.0"]
+        Py --> HAL
+        Zg --> HAL
+    end
+
+    Net <--> Py
+    Net <--> Zg
+
+    subgraph HAT["Adeept Robot HAT V3.2"]
+        direction TB
+        PCA["PCA9685 PWM — I2C 0x5f"]
+        ADS["ADS7830 ADC — I2C 0x48"]
+        Sonar["HC-SR04 sonar — GPIO 23/24"]
+        Line["IR line tracker — GPIO 22/27/17"]
+        LED["WS2812 LEDs — SPI0, GPIO 10"]
+        Buzz["Buzzer — GPIO PWM"]
+    end
+
+    HAL --> PCA
+    HAL --> ADS
+    HAL --> Sonar
+    HAL --> Line
+    HAL --> LED
+    HAL --> Buzz
+    PCA --> Drive["4 DC motors and 8 servos"]
+```
+
+Only one of `Adeept_Robot.service` (vendor Python, `:8888`) and `awr-v3-zig.service` (this project's Zig firmware, `:8889`) should be active at a time on a given Pi — they share the same I²C and GPIO pins on the HAT. The `awr-stack` helper makes that toggle one command (see below). The dashboard's connection presets cover both ports out of the box.
+
 Local development loop:
 
 ```bash
@@ -116,15 +173,25 @@ These checks currently assume the Node simulator (`/capabilities`, `/state`, aut
 
 The tests cover authentication, telemetry, capabilities discovery, and action effects. They assert that commands such as speed changes, movement, stop, camera tilt, lights, tunes, LED switches, robot modes, and servo calibration mutate the simulator's `/state` endpoint instead of only returning `ok`.
 
-### End-to-end black-box acceptance (no Pi required)
+### End-to-end black-box acceptance (no Pi required) — dual-stack
 
-The companion **`zig-awr-v3`** repo ships `scripts/run-functional-acceptance.sh`, which builds a **Raspberry Pi OS Bookworm** (`linux/arm64`) Docker image, runs `install-pi.sh` for real, starts the compiled Zig binary, and then runs **this dashboard's `npm run test:protocol`** against the Node simulator AND a generic black-box WS test against the Zig binary in the same pipeline (8 phases, ~30 s, currently 50 / 50 PASS). From the parent directory of both repos:
+The companion **`zig-awr-v3`** repo ships `scripts/run-functional-acceptance.sh`, which boots a **Raspberry Pi OS Bookworm** (`linux/arm64`) Docker image and runs the *entire* AWR-V3 stack end-to-end — both implementations:
+
+- Zig firmware: `install-pi.sh`, the compiled binary, full SLAM protocol test, `awr-stack` toggles, `uninstall-pi.sh`.
+- Vendor Python firmware (the original Adeept stack): `setup.py`, the real `WebServer.py` running on `:8888` with hardware stubs, the same generic black-box WS protocol test (common subset, no SLAM), additive install on top of the Zig stack, and final cleanup.
+- This dashboard's `npm run test:protocol` against the Node simulator.
+- A live **dual-stack phase** that brings vendor Python (`:8888`) and Zig (`:8889`) up *concurrently* and runs the protocol acceptance against both at the same time.
+
+From the parent directory of both repos:
 
 ```bash
+# Optional: point at the vendor V3 source (auto-detected from
+# ~/Downloads/Adeept_AWR-V3-*/Code/Adeept_AWR-V3 if not set)
+export VENDOR_SRC=/path/to/Adeept_AWR-V3
 bash zig-awr-v3/scripts/run-functional-acceptance.sh
 ```
 
-This is the closest thing to a Pi-on-the-bench reproduction without the hardware, and it is what should run before merging any change to either side of the protocol contract.
+Currently **88 / 88 PASS** across **13 phases**, ~100 s on Apple Silicon. This is the closest thing to a Pi-on-the-bench reproduction without the hardware, and is what should run before merging any change to either side of the protocol contract.
 
 ## Type Checking & Linting
 
@@ -198,6 +265,73 @@ The control panel and simulation server implement the AWR-V3 WebSocket protocol:
 | `slam_reset` | Reset occupancy grid and pose |
 | `get_map` | Returns `{title:"get_map", data:{size, cell_cm, x, y, theta, frontiers, coverage, mapping, grid}}` |
 | `slam_plan X Y` | Returns `{title:"slam_plan", data:{found, length}}` (A\*) |
+
+### Protocol sequence — full live SLAM session
+
+The exchange the dashboard performs against the firmware (Zig binary or Node simulator — same contract) when the operator opens **Live Occupancy Map** and drives the robot:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Operator
+    participant D as Dashboard
+    participant W as WS server :8889
+    participant S as SLAM thread
+    participant H as HAL and sensors
+
+    U->>D: Click Connect
+    D->>W: TCP connect and WS upgrade
+    W-->>D: 101 Switching Protocols
+    D->>W: admin:123456
+    W-->>D: congratulation, you have connect with server
+
+    D->>W: get_info
+    W->>H: ADS7830, line, sonar reads
+    H-->>W: telemetry
+    W-->>D: title=get_info, data=v,a,b,c
+
+    rect rgba(120, 180, 255, 0.10)
+        Note over U,H: Start a live SLAM session
+        U->>D: Toggle Live mapping
+        D->>W: slam_reset
+        W->>S: grid reset
+        W-->>D: status=ok
+        D->>W: mapping
+        W->>S: spawn 250 ms tick loop
+        W-->>D: title=mapping
+    end
+
+    par Pi side — SLAM thread every 250 ms
+        S->>H: ultrasonic read
+        H-->>S: distance_cm
+        S->>S: scanUltrasonic pose, dist
+    and Pi side — drive commands
+        U->>D: WASD or arrow keys
+        D->>W: forward
+        W->>H: motor forward
+        W->>S: applyTranslate STEP_CM, +1
+        W-->>D: status=ok
+    and Dashboard side — poll every 500 ms
+        D->>W: get_map
+        W->>S: encodeAscii grid
+        S-->>W: ASCII grid and pose
+        W-->>D: title=get_map, data=size,x,y,theta,frontiers,coverage,mapping,grid
+        D->>D: render canvas and stats
+    end
+
+    U->>D: Submit Plan to 50, 50
+    D->>W: slam_plan 50 50
+    W->>S: A* findPath from pose to 50,50
+    S-->>W: path or null
+    W-->>D: title=slam_plan, data=found, length
+
+    U->>D: Toggle Live mapping off
+    D->>W: mappingOff
+    W->>S: stop=true and thread join
+    W-->>D: title=mappingOff
+```
+
+This is the contract the protocol acceptance suite asserts against, end-to-end: `tests/ws-protocol.test.mjs` exercises it against the Node simulator, and the [zig-awr-v3 black-box acceptance run](#end-to-end-black-box-acceptance-no-pi-required) drives the same exchange against a real compiled Zig binary running inside a Pi OS Bookworm container.
 
 ## Tech Stack
 
