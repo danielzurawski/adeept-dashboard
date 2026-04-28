@@ -13,6 +13,11 @@ export interface LogEntry {
   message: string
 }
 
+export interface ConnectOptions {
+  url: string
+  authMessage: string
+}
+
 export function useWebSocket() {
   const [connected, setConnected] = useState(false)
   const [connecting, setConnecting] = useState(false)
@@ -28,7 +33,7 @@ export function useWebSocket() {
     setLog(prev => [{ time, direction, message }, ...prev].slice(0, 50))
   }, [])
 
-  const connect = useCallback((url: string) => {
+  const connect = useCallback(({ url, authMessage }: ConnectOptions) => {
     if (wsRef.current) {
       wsRef.current.close()
     }
@@ -39,9 +44,8 @@ export function useWebSocket() {
       setConnected(true)
       setConnecting(false)
       addLog('received', 'Connected to robot server')
-      // Send auth
-      ws.send('admin:123456')
-      addLog('sent', 'admin:123456')
+      ws.send(authMessage)
+      addLog('sent', '<auth>')
       // Start polling system info
       pollRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {

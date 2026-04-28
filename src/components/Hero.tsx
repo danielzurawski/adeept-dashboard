@@ -1,11 +1,11 @@
 import { Card, CardContent } from '@/components/ui/card'
-import { Cpu, Gauge, Wifi, Cog } from 'lucide-react'
+import { Gamepad2, Music, ShieldCheck, Smartphone } from 'lucide-react'
 
 const stats = [
-  { icon: Gauge, label: '4WD Drive', desc: '4 DC motors, differential steering' },
-  { icon: Cpu, label: '17+ Features', desc: 'Vision, autonomy, sensors, LEDs' },
-  { icon: Cog, label: '16-Ch PWM', desc: 'PCA9685 servo/motor controller' },
-  { icon: Wifi, label: '3 Interfaces', desc: 'Web UI, Mobile App, Desktop GUI' },
+  { icon: Gamepad2, label: 'Drive Deck', desc: 'Touch, keyboard, and speed control' },
+  { icon: Music, label: 'Demo Pad', desc: 'Songs, lights, sensors, camera tricks' },
+  { icon: ShieldCheck, label: 'Safety First', desc: 'Motor arming and big stop controls' },
+  { icon: Smartphone, label: 'PWA Ready', desc: 'Designed for mobile and wrappers' },
 ]
 
 export function Hero() {
@@ -18,11 +18,11 @@ export function Hero() {
           </span>
         </h1>
         <p className="text-xl md:text-2xl text-muted-foreground mb-2">
-          Open-Source 4WD Smart Robot Platform
+          Playful Robot Cockpit
         </p>
         <p className="text-sm text-muted-foreground mb-12 max-w-2xl mx-auto">
-          A Raspberry Pi-based intelligent robot featuring computer vision, autonomous navigation,
-          sensor integration, and multi-interface remote control. Built for education and hobbyist robotics.
+          A touch-friendly control surface for driving, lights, songs, camera demos, sensor checks,
+          and kid-friendly experiments. The manual is still linked, but the main page is for using the robot.
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {stats.map((s) => (

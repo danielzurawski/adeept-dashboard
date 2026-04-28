@@ -19,19 +19,16 @@ A React/TypeScript web dashboard for the Adeept AWR-V3 4WD robot. It serves as b
 
 ### WebSocket Simulation Server (`ws-server.mjs`)
 
-- Runs on **Bun** (not Node.js) using `Bun.serve()` with native WebSocket support
+- Runs on **Node.js** using `node:http` and `ws`
 - Port **8889**
-- Implements the full AWR-V3 protocol: authentication handshake, command dispatch, simulated `get_info` telemetry with randomized values
+- Implements the AWR-V3 protocol: authentication handshake, command dispatch, simulated `get_info` telemetry with randomized values, and `/state` for protocol test assertions
 - Stateless per-connection authentication (no sessions/tokens)
 - Credentials are hardcoded in the simulator (`admin:123456`) since this is a development tool, not production
 
-### E2E Tests (`tests/ws-protocol.test.ts`)
+### Protocol Tests (`tests/ws-protocol.test.mjs` + `scripts/run-protocol-tests.mjs`)
 
-- Uses **Bun's test runner** (`bun:test`)
-- 55 tests across 12 suites validating every protocol command
-- Tests connect to `ws://localhost:8889` — requires the simulation server (or the Zig firmware server) to be running
-- Helper functions: `openWs()`, `sendAndReceive()`, `authenticate()`, `authAndCommand()`
-- Tests are intentionally compatible with both the Bun simulator AND the Zig firmware server — the same 55 tests pass against either
+- `npm run test:protocol` runs **`scripts/run-protocol-tests.mjs`**, which starts `ws-server.mjs`, waits for `/capabilities`, executes `node --test tests/ws-protocol.test.mjs`, then stops the simulator.
+- `npm run test:protocol:only` assumes a listener is already on **`ws://localhost:8889`** — use with **`npm run robot:sim`** (Node simulator), not as a drop-in for arbitrary firmware without matching HTTP routes and auth strings.
 
 ## Key Files
 
@@ -39,22 +36,24 @@ A React/TypeScript web dashboard for the Adeept AWR-V3 4WD robot. It serves as b
 |------|---------|-------|
 | `src/App.tsx` | Root layout, navigation, app panel routing | ~130 |
 | `src/hooks/useWebSocket.ts` | WebSocket connection, polling, command dispatch | ~120 |
-| `src/components/ControlPanel.tsx` | Interactive robot controls with keyboard shortcuts | ~305 |
+| `src/components/ControlPanel.tsx` | Interactive robot controls with keyboard shortcuts | ~540 |
 | `src/components/apps/OccupancyMap.tsx` | Canvas-based 2D grid exploration simulation | ~350 |
-| `src/components/apps/AppGallery.tsx` | 28-app gallery with search and category tabs | ~160 |
+| `src/components/apps/AppGallery.tsx` | Capabilities and roadmap gallery with search/category tabs | ~250 |
 | `src/components/apps/CameraView.tsx` | MJPEG stream viewer with connection controls | ~140 |
-| `ws-server.mjs` | Bun WebSocket protocol simulator | ~78 |
-| `tests/ws-protocol.test.ts` | 55 E2E protocol acceptance tests | ~510 |
+| `ws-server.mjs` | Node WebSocket protocol simulator | ~130 |
+| `scripts/run-protocol-tests.mjs` | Orchestrates simulator + protocol tests | ~80 |
+| `tests/ws-protocol.test.mjs` | Protocol acceptance tests | ~160 |
 
 ## Development Commands
 
 ```bash
 npm install                          # Install dependencies
-bun run ws-server.mjs &              # Start simulation server (port 8889)
+npm run robot:sim                    # Start simulation server (port 8889)
 npm run dev                          # Start Vite dev server (port 8080)
 npx tsc -b --noEmit                  # Type check (strict mode, zero errors expected)
-npx eslint src/                      # Lint (zero errors, 1 accepted shadcn warning expected)
-bun test                             # Run 55 E2E tests (requires ws-server running)
+npx eslint src/                      # Lint (zero warnings with current config)
+npm run test:protocol                # Starts simulator, runs protocol tests, exits
+npm run test:protocol:only           # Tests only; expects robot:sim already on :8889
 ```
 
 ## Conventions
@@ -69,11 +68,11 @@ bun test                             # Run 55 E2E tests (requires ws-server runn
 
 ## Companion Project
 
-This dashboard is designed to work with the **Zig AWR-V3 firmware** (`zig-awr-v3/`), a Zig rewrite of the original Python robot control software. The same 55 E2E tests validate both the Bun simulation server and the Zig firmware's WebSocket server. The Zig server uses environment variables `AWR_WS_USER`/`AWR_WS_PASS` for credentials instead of hardcoding them.
+This dashboard is designed to work with the **Zig AWR-V3 firmware** (`zig-awr-v3/`), a Zig rewrite of the original Python robot control software. The dashboard remains decoupled as long as the firmware exposes the same AWR-V3 WebSocket protocol.
 
 ## Known Issues / Future Work
 
 - The `resolution` dropdown in CameraView.tsx is cosmetic — it does not affect the stream URL
 - The OccupancyMap simulation is frontend-only; real SLAM integration requires the Zig firmware's occupancy grid data streamed over WebSocket
-- The AppGallery "Open" button only works for `camera-view` and `occupancy-map`; other apps show the button but have no panel implementation yet
+- The Capabilities gallery only opens implemented panels; other capabilities point users to the Control Deck, Robot Modes, Demo Pad, or telemetry
 - WebSocket reconnection is not automatic — the user must click Disconnect/Connect manually

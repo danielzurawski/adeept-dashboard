@@ -1,27 +1,21 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Hero } from '@/components/Hero'
-import { HardwareSection } from '@/components/HardwareSection'
-import { SoftwareSection } from '@/components/SoftwareSection'
 import { ControlPanel } from '@/components/ControlPanel'
-import { CapabilitiesSection } from '@/components/CapabilitiesSection'
-import { ProposalsSection } from '@/components/ProposalsSection'
 import { CameraView } from '@/components/apps/CameraView'
 import { OccupancyMap } from '@/components/apps/OccupancyMap'
 import { AppGallery } from '@/components/apps/AppGallery'
+import { ResourcesSection } from '@/components/ResourcesSection'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Bot, LayoutGrid, X } from 'lucide-react'
 
 const navLinks = [
-  { href: '#overview', label: 'Overview' },
-  { href: '#hardware', label: 'Hardware' },
-  { href: '#software', label: 'Architecture' },
-  { href: '#control', label: 'Control Panel' },
-  { href: '#capabilities', label: 'Capabilities' },
+  { href: '#overview', label: 'Cockpit' },
+  { href: '#control', label: 'Control' },
   { href: '#apps', label: 'Apps' },
-  { href: '#proposals', label: 'Proposals' },
+  { href: '#resources', label: 'Resources' },
 ]
 
 // Map of app IDs to their component panels
@@ -36,8 +30,6 @@ export default function App() {
   const handleOpenApp = (id: string) => {
     if (appPanels[id]) {
       setActiveApp(id)
-      // Scroll to apps section
-      document.getElementById('apps')?.scrollIntoView({ behavior: 'smooth' })
     }
   }
 
@@ -68,13 +60,7 @@ export default function App() {
       <main>
         <Hero />
         <Separator />
-        <HardwareSection />
-        <Separator />
-        <SoftwareSection />
-        <Separator />
         <ControlPanel />
-        <Separator />
-        <CapabilitiesSection />
         <Separator />
 
         {/* Apps Section */}
@@ -84,10 +70,10 @@ export default function App() {
               <div>
                 <h2 className="text-3xl font-bold flex items-center gap-3">
                   <LayoutGrid className="h-8 w-8 text-primary" />
-                  Robot Apps
+                  Capabilities & Roadmap
                 </h2>
                 <p className="text-muted-foreground mt-1">
-                  Mini applications and features for the AWR-V3 platform. Built-in capabilities, ready-to-deploy modules, and upcoming features.
+                  What the dashboard can do now, separated from ideas that still need robot, backend, or hardware work.
                 </p>
               </div>
             </div>
@@ -110,12 +96,12 @@ export default function App() {
             )}
 
             {/* Gallery */}
-            <AppGallery onOpenApp={handleOpenApp} />
+            <AppGallery openableAppIds={Object.keys(appPanels)} onOpenApp={handleOpenApp} />
           </div>
         </section>
 
         <Separator />
-        <ProposalsSection />
+        <ResourcesSection />
       </main>
 
       {/* Footer */}

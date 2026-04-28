@@ -4,21 +4,35 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Camera, RefreshCw, Maximize2, ZoomIn, ZoomOut, Settings } from 'lucide-react'
 
+const cameraPresets = [
+  { label: 'Python robot Flask stream', url: 'http://raspberry-pi.local:5000/video_feed' },
+  { label: 'Robot hotspot Flask stream', url: 'http://192.168.4.1:5000/video_feed' },
+  { label: 'LAN Flask stream', url: 'http://192.168.86.34:5000/video_feed' },
+]
+
+const cameraUrlStorageKey = 'awr-v3.cameraUrl'
+
 export function CameraView() {
   const [streamUrl, setStreamUrl] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [resolution, setResolution] = useState('640x480')
-  const [ipInput, setIpInput] = useState('192.168.4.1')
+  const [cameraUrl, setCameraUrl] = useState(() => localStorage.getItem(cameraUrlStorageKey) ?? cameraPresets[0].url)
 
   const startStream = () => {
-    const url = `http://${ipInput}:5000/video_feed`
-    setStreamUrl(url)
+    localStorage.setItem(cameraUrlStorageKey, cameraUrl)
+    setStreamUrl(cameraUrl)
     setStreaming(true)
   }
 
   const stopStream = () => {
     setStreamUrl('')
     setStreaming(false)
+  }
+
+  const applyPreset = (index: number) => {
+    const preset = cameraPresets[index]
+    if (!preset) return
+    setCameraUrl(preset.url)
   }
 
   return (
@@ -32,7 +46,7 @@ export function CameraView() {
                 Live Camera Feed
               </CardTitle>
               <CardDescription>
-                MJPEG stream from the robot's picamera2 via Flask on port 5000
+                MJPEG stream URL. The original Python stack serves Flask on port 5000; Zig camera streaming can use the same URL contract later.
               </CardDescription>
             </div>
             <Badge variant={streaming ? 'success' : 'secondary'}>
@@ -43,12 +57,24 @@ export function CameraView() {
         <CardContent>
           {/* Connection */}
           <div className="flex flex-wrap gap-2 mb-4">
+            <select
+              onChange={(e) => applyPreset(Number(e.target.value))}
+              defaultValue=""
+              className="bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              disabled={streaming}
+            >
+              <option value="" disabled>Camera preset</option>
+              {cameraPresets.map((preset, index) => (
+                <option key={preset.label} value={index}>{preset.label}</option>
+              ))}
+            </select>
             <input
               type="text"
-              value={ipInput}
-              onChange={(e) => setIpInput(e.target.value)}
-              placeholder="Robot IP (e.g. 192.168.4.1)"
+              value={cameraUrl}
+              onChange={(e) => setCameraUrl(e.target.value)}
+              placeholder="http://robot-ip:5000/video_feed"
               className="flex-1 min-w-[180px] bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              disabled={streaming}
             />
             <select
               value={resolution}
@@ -86,8 +112,8 @@ export function CameraView() {
               <div className="text-center text-muted-foreground">
                 <Camera className="h-16 w-16 mx-auto mb-3 opacity-20" />
                 <p className="text-sm">No camera feed</p>
-                <p className="text-xs mt-1">Enter the robot's IP address and click Start Stream</p>
-                <p className="text-xs mt-1">The robot serves MJPEG at http://IP:5000/video_feed</p>
+                <p className="text-xs mt-1">Enter an MJPEG stream URL and click Start Stream</p>
+                <p className="text-xs mt-1">Python default: http://raspberry-pi.local:5000/video_feed</p>
               </div>
             )}
 
@@ -108,7 +134,7 @@ export function CameraView() {
           <div className="mt-3 grid grid-cols-3 gap-3 text-xs text-muted-foreground">
             <div className="flex items-center gap-1"><Settings className="h-3 w-3" /> Format: MJPEG</div>
             <div className="flex items-center gap-1"><ZoomIn className="h-3 w-3" /> Res: {resolution}</div>
-            <div className="flex items-center gap-1"><ZoomOut className="h-3 w-3" /> Port: 5000</div>
+            <div className="flex items-center gap-1"><ZoomOut className="h-3 w-3" /> URL: configurable</div>
           </div>
         </CardContent>
       </Card>

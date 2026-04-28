@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "robot:sim": "node ws-server.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:protocol": "node scripts/run-protocol-tests.mjs",
+    "test:protocol:only": "node --test tests/ws-protocol.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
