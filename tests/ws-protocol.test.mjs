@@ -149,6 +149,49 @@ describe("AWR-V3 simulator protocol", () => {
       assert.equal(capabilities.hardware.movement, true);
       assert.equal(capabilities.hardware.cameraTilt, true);
       assert.equal(capabilities.hardware.buzzer, true);
+      assert.equal(capabilities.hardware.slam, true);
+      assert.equal(typeof capabilities.slam.gridSize, "number");
+    });
+  });
+
+  describe("SLAM mapping protocol", () => {
+    it("starts mapping, advances pose on movement, and returns get_map and slam_plan envelopes", async () => {
+      const ws = await openWs();
+      try {
+        await authenticate(ws);
+        // Reset to a deterministic starting state
+        assert.equal(JSON.parse(await sendAndReceive(ws, "slam_reset")).status, "ok");
+
+        const startMap = JSON.parse(await sendAndReceive(ws, "get_map"));
+        assert.equal(startMap.title, "get_map");
+        assert.equal(typeof startMap.data.grid, "string");
+        assert.equal(startMap.data.grid.length, startMap.data.size * startMap.data.size);
+        const startX = startMap.data.x;
+
+        assert.equal(JSON.parse(await sendAndReceive(ws, "mapping")).title, "mapping");
+        let state = await getState();
+        assert.equal(state.slam.mapping, true);
+
+        // Advance the pose with a forward command, then verify map exposes it
+        for (const cmd of ["forward", "forward", "forward"]) {
+          assert.equal(JSON.parse(await sendAndReceive(ws, cmd)).status, "ok");
+        }
+        const afterMap = JSON.parse(await sendAndReceive(ws, "get_map"));
+        assert.equal(afterMap.title, "get_map");
+        assert.ok(afterMap.data.x >= startX, "pose_x should advance forward (or stay clamped)");
+        assert.equal(afterMap.data.mapping, true);
+
+        const plan = JSON.parse(await sendAndReceive(ws, "slam_plan 50 50"));
+        assert.equal(plan.title, "slam_plan");
+        assert.equal(plan.data.found, true);
+        assert.ok(plan.data.length >= 0);
+
+        assert.equal(JSON.parse(await sendAndReceive(ws, "mappingOff")).title, "mappingOff");
+        state = await getState();
+        assert.equal(state.slam.mapping, false);
+      } finally {
+        ws.close();
+      }
     });
   });
 });

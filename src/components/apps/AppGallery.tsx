@@ -46,7 +46,8 @@ const capabilities: CapabilityDef[] = [
   { id: 'buzzer-music', name: 'Buzzer Music', icon: Music, desc: 'Runs backend-supported tones and tunes from the Demo Pad.', category: 'output', tags: ['buzzer', 'gpio'], surface: 'demo-pad', command: 'tone / tune' },
   { id: 'battery-mon', name: 'Battery Monitor', icon: Gauge, desc: 'Shows battery telemetry returned by the backend info packet.', category: 'system', tags: ['adc', 'i2c'], surface: 'telemetry', command: 'get_info' },
   { id: 'sys-info', name: 'System Info', icon: Thermometer, desc: 'Shows CPU temperature, CPU usage, RAM usage, and battery fields from backend telemetry.', category: 'system', tags: ['psutil'], surface: 'telemetry', command: 'get_info' },
-  { id: 'occupancy-map', name: 'Occupancy Map Panel', icon: Map, desc: 'Interactive dashboard-side occupancy grid prototype for validating mapping UI and exploration concepts before robot integration.', category: 'autonomy', tags: ['slam', 'prototype'], surface: 'panel', safety: 'Simulation panel; not yet commanding the robot' },
+  { id: 'live-occupancy-map', name: 'Live Occupancy Map', icon: Map, desc: 'Real backend SLAM panel: toggles mapping on the firmware, streams the occupancy grid, and exposes A* path planning over the same WebSocket.', category: 'autonomy', tags: ['slam', 'ultrasonic', 'astar'], surface: 'panel', command: 'mapping / mappingOff / get_map / slam_plan', safety: 'Pose is dead-reckoned; map drifts over long runs' },
+  { id: 'occupancy-map', name: 'Occupancy Map (sim)', icon: Map, desc: 'Browser-only occupancy grid demo. Useful for showcasing mapping UI without a robot connected; does not command the robot.', category: 'autonomy', tags: ['slam', 'prototype'], surface: 'panel', safety: 'Pure dashboard simulation' },
 ]
 
 const roadmap: RoadmapDef[] = [

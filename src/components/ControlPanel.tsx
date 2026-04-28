@@ -8,7 +8,7 @@ import {
   ChevronUp, ChevronDown, Plug, Unplug, Thermometer, Cpu, MemoryStick,
   Battery, Square, Lightbulb, Siren, Eye, Palette, GitBranch, Ruler,
   ShieldAlert, ScanLine, Music, Sparkles, Volume2, Gamepad2, ShieldCheck,
-  Radio, Activity, type LucideIcon
+  Radio, Activity, Map, type LucideIcon
 } from 'lucide-react'
 
 const connectionPresets = [
@@ -483,6 +483,7 @@ export function ControlPanel() {
                   { name: 'trackLine', label: 'Track Line', on: 'trackLine', off: 'trackLineOff', icon: GitBranch, requiresArm: true },
                   { name: 'keepDistance', label: 'Keep Distance', on: 'keepDistance', off: 'keepDistanceOff', icon: Ruler, requiresArm: true },
                   { name: 'cvfl', label: 'CV Line Follow', on: 'CVFL', off: 'stopCV', icon: ScanLine, requiresArm: true },
+                  { name: 'mapping', label: 'Live Mapping', on: 'mapping', off: 'mappingOff', icon: Map },
                 ].map((f) => (
                   <Button
                     key={f.name}

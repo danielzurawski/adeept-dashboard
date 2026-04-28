@@ -4,7 +4,7 @@ This document provides context for coding agents working on this project.
 
 ## Project Summary
 
-A React/TypeScript web dashboard for the Adeept AWR-V3 4WD robot. It serves as both a documentation hub (hardware specs, software architecture, expansion proposals) and an interactive control interface (WebSocket-based robot control, camera feed, occupancy mapping).
+A React/TypeScript web dashboard for the Adeept AWR-V3 4WD robot. It runs locally as a PWA and connects to a remote firmware endpoint (vendor Python on `:8888`, Zig firmware on `:8889`, or the bundled Node simulator on `:8889`). It owns the cockpit UI, demo pad, robot-mode toggles, live SLAM panel, and the protocol acceptance suite. It does **not** ship hardware control code.
 
 ## Architecture
 
@@ -14,14 +14,14 @@ A React/TypeScript web dashboard for the Adeept AWR-V3 4WD robot. It serves as b
 - **Theme**: Dark mode only, defined via CSS custom properties in `src/index.css` using Tailwind v4's `@theme` directive
 - **Path aliases**: `@/` maps to `src/` (configured in `vite.config.ts` and `tsconfig.app.json`)
 - **Component pattern**: shadcn/ui style — primitive components in `src/components/ui/` use CVA (class-variance-authority) for variants. Application components compose these primitives.
-- **State management**: Local React state only (useState/useRef). No global store. The `useWebSocket` hook in `src/hooks/useWebSocket.ts` manages WebSocket connection state, system info polling, and command logging.
+- **State management**: A single `WebSocketProvider` (in `src/hooks/useWebSocket.tsx`) owns the WebSocket connection, telemetry polling, command log, and the latest `get_map` snapshot. Both `ControlPanel` and `LiveOccupancyMap` consume it via `useWebSocket()`. Outside of that, components use local `useState`/`useRef`.
 - **No router**: Single-page scroll layout with anchor-based section navigation.
 
 ### WebSocket Simulation Server (`ws-server.mjs`)
 
 - Runs on **Node.js** using `node:http` and `ws`
 - Port **8889**
-- Implements the AWR-V3 protocol: authentication handshake, command dispatch, simulated `get_info` telemetry with randomized values, and `/state` for protocol test assertions
+- Implements the AWR-V3 protocol: authentication handshake, command dispatch, simulated `get_info` telemetry, and a SLAM track (`mapping`/`mappingOff`/`slam_reset`/`get_map`/`slam_plan`) with a fake mapping thread that updates the simulated grid as forward/rotate commands arrive. Exposes `/state` and `/capabilities` for protocol-test assertions.
 - Stateless per-connection authentication (no sessions/tokens)
 - Credentials are hardcoded in the simulator (`admin:123456`) since this is a development tool, not production
 
@@ -34,15 +34,17 @@ A React/TypeScript web dashboard for the Adeept AWR-V3 4WD robot. It serves as b
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `src/App.tsx` | Root layout, navigation, app panel routing | ~130 |
-| `src/hooks/useWebSocket.ts` | WebSocket connection, polling, command dispatch | ~120 |
-| `src/components/ControlPanel.tsx` | Interactive robot controls with keyboard shortcuts | ~540 |
-| `src/components/apps/OccupancyMap.tsx` | Canvas-based 2D grid exploration simulation | ~350 |
-| `src/components/apps/AppGallery.tsx` | Capabilities and roadmap gallery with search/category tabs | ~250 |
+| `src/App.tsx` | Root layout, `WebSocketProvider`, navigation, app panel routing | ~140 |
+| `src/hooks/useWebSocket.tsx` | WebSocket provider/hook with `latestMap` snapshot streaming | ~190 |
+| `src/components/ControlPanel.tsx` | Interactive robot controls + Live Mapping mode toggle + keyboard shortcuts | ~560 |
+| `src/components/apps/LiveOccupancyMap.tsx` | Real backend SLAM panel (mapping/get_map/slam_plan) | ~230 |
+| `src/components/apps/OccupancyMap.tsx` | Browser-only 2D grid exploration simulation | ~350 |
+| `src/components/apps/AppGallery.tsx` | Capabilities and roadmap gallery with search/category tabs | ~260 |
 | `src/components/apps/CameraView.tsx` | MJPEG stream viewer with connection controls | ~140 |
-| `ws-server.mjs` | Node WebSocket protocol simulator | ~130 |
+| `ws-server.mjs` | Node WebSocket protocol simulator (incl. SLAM track) | ~250 |
 | `scripts/run-protocol-tests.mjs` | Orchestrates simulator + protocol tests | ~80 |
-| `tests/ws-protocol.test.mjs` | Protocol acceptance tests | ~160 |
+| `scripts/setup-dashboard.sh` | One-shot local setup (Node check + npm install) | ~40 |
+| `tests/ws-protocol.test.mjs` | Protocol acceptance tests (auth, telemetry, actions, SLAM) | ~210 |
 
 ## Development Commands
 
@@ -70,9 +72,12 @@ npm run test:protocol:only           # Tests only; expects robot:sim already on 
 
 This dashboard is designed to work with the **Zig AWR-V3 firmware** (`zig-awr-v3/`), a Zig rewrite of the original Python robot control software. The dashboard remains decoupled as long as the firmware exposes the same AWR-V3 WebSocket protocol.
 
+The Zig repo's `scripts/install-pi.sh` is the equivalent of the vendor `setup.py` for the new stack, and ships an `awr-stack` helper (`python|zig|both|stop|status`) so a single Pi can host both the vendor `Adeept_Robot.service` and `awr-v3-zig.service` and switch between them. The dashboard's connection presets cover both ports out of the box.
+
 ## Known Issues / Future Work
 
 - The `resolution` dropdown in CameraView.tsx is cosmetic — it does not affect the stream URL
-- The OccupancyMap simulation is frontend-only; real SLAM integration requires the Zig firmware's occupancy grid data streamed over WebSocket
+- The browser-only `OccupancyMap` (sim) is preserved for offline UI demos; the real surface is the new **Live Occupancy Map** panel which talks to the firmware via `mapping`/`get_map`/`slam_plan`
+- Pose tracking on the Zig firmware is dead-reckoned (no encoders / IMU yet), so the live map drifts on long runs — mark this clearly in any new SLAM features
 - The Capabilities gallery only opens implemented panels; other capabilities point users to the Control Deck, Robot Modes, Demo Pad, or telemetry
 - WebSocket reconnection is not automatic — the user must click Disconnect/Connect manually

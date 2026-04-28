@@ -4,11 +4,13 @@ import { Hero } from '@/components/Hero'
 import { ControlPanel } from '@/components/ControlPanel'
 import { CameraView } from '@/components/apps/CameraView'
 import { OccupancyMap } from '@/components/apps/OccupancyMap'
+import { LiveOccupancyMap } from '@/components/apps/LiveOccupancyMap'
 import { AppGallery } from '@/components/apps/AppGallery'
 import { ResourcesSection } from '@/components/ResourcesSection'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { WebSocketProvider } from '@/hooks/useWebSocket'
 import { Bot, LayoutGrid, X } from 'lucide-react'
 
 const navLinks = [
@@ -21,10 +23,11 @@ const navLinks = [
 // Map of app IDs to their component panels
 const appPanels: Record<string, { label: string; component: ReactNode }> = {
   'camera-view': { label: 'Live Camera', component: <CameraView /> },
-  'occupancy-map': { label: 'Occupancy Mapping', component: <OccupancyMap /> },
+  'live-occupancy-map': { label: 'Live Occupancy Map', component: <LiveOccupancyMap /> },
+  'occupancy-map': { label: 'Occupancy Mapping (sim)', component: <OccupancyMap /> },
 }
 
-export default function App() {
+function AppShell() {
   const [activeApp, setActiveApp] = useState<string | null>(null)
 
   const handleOpenApp = (id: string) => {
@@ -112,5 +115,13 @@ export default function App() {
         </div>
       </footer>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <WebSocketProvider>
+      <AppShell />
+    </WebSocketProvider>
   )
 }
