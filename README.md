@@ -116,6 +116,16 @@ These checks currently assume the Node simulator (`/capabilities`, `/state`, aut
 
 The tests cover authentication, telemetry, capabilities discovery, and action effects. They assert that commands such as speed changes, movement, stop, camera tilt, lights, tunes, LED switches, robot modes, and servo calibration mutate the simulator's `/state` endpoint instead of only returning `ok`.
 
+### End-to-end black-box acceptance (no Pi required)
+
+The companion **`zig-awr-v3`** repo ships `scripts/run-functional-acceptance.sh`, which builds a **Raspberry Pi OS Bookworm** (`linux/arm64`) Docker image, runs `install-pi.sh` for real, starts the compiled Zig binary, and then runs **this dashboard's `npm run test:protocol`** against the Node simulator AND a generic black-box WS test against the Zig binary in the same pipeline (8 phases, ~30 s, currently 50 / 50 PASS). From the parent directory of both repos:
+
+```bash
+bash zig-awr-v3/scripts/run-functional-acceptance.sh
+```
+
+This is the closest thing to a Pi-on-the-bench reproduction without the hardware, and it is what should run before merging any change to either side of the protocol contract.
+
 ## Type Checking & Linting
 
 ```bash
