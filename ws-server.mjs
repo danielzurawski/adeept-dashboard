@@ -191,7 +191,11 @@ wss.on("connection", (ws) => {
           (60 + Math.random() * 35).toFixed(0),
         ];
       } else if (msg.startsWith("wsB ")) {
-        state.speed = parseInt(msg.split(" ")[1], 10) || 50;
+        // Note: don't use `|| 50` here — parseInt("0", 10) returns 0,
+        // which is falsy and would silently round-trip as 50. We
+        // accept any 0..100 integer and fall back to 50 only on NaN.
+        const parsed = parseInt(msg.split(" ")[1], 10);
+        state.speed = Number.isFinite(parsed) ? parsed : 50;
         console.log(`[SIM] Speed: ${state.speed}`);
       } else if (msg.startsWith("tone ")) {
         state.lastTune = msg;

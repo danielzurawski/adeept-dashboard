@@ -138,11 +138,23 @@ export function LiveOccupancyMap() {
     setPolling(true)
   }
   const stop = () => {
-    if (connected) sendCommand('mappingOff')
+    if (connected) {
+      sendCommand('mappingOff')
+      // Polling is about to stop, so push one final get_map so
+      // `latestMap.mapping` reflects the disabled state and the
+      // status badge flips back to IDLE without waiting for the
+      // user to hit Refresh.
+      sendCommand('get_map')
+    }
     setPolling(false)
   }
   const reset = () => {
-    if (connected) sendCommand('slam_reset')
+    if (!connected) return
+    sendCommand('slam_reset')
+    // Surface the cleared grid + zeroed pose in the UI immediately
+    // so the user sees the reset land without polling having to
+    // resume. Also keeps the test suite deterministic.
+    sendCommand('get_map')
   }
   const scanOnce = () => {
     if (connected) sendCommand('get_map')
